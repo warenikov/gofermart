@@ -69,19 +69,15 @@ make test-all
 
 ## Тестирование с accrual-сервисом
 
-1. Запустите PostgreSQL:
+Accrual хранит данные в памяти — база данных ему не нужна.
 
-```bash
-docker compose up db -d
-```
-
-2. Запустите accrual-сервис:
+1. Запустите accrual-сервис:
 
 ```bash
 make accrual-start
 ```
 
-3. Наполните accrual тестовыми данными:
+2. Наполните accrual тестовыми данными:
 
 ```bash
 make seed
