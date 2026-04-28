@@ -10,11 +10,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	ConsoleLevel = zapcore.InfoLevel
-	JSONLevel    = zapcore.DebugLevel
-)
-
 // New создаёт корневой логгер с указанным уровнем и форматом.
 // level: debug | info | warn | error
 // format: json | console

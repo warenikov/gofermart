@@ -4,28 +4,29 @@ package config
 
 import (
 	"flag"
-	"os"
+
+	"github.com/caarlos0/env/v6"
 )
 
 // Config содержит параметры запуска сервиса.
 type Config struct {
 	// RunAddress — адрес и порт HTTP-сервера (флаг -a, env RUN_ADDRESS).
-	RunAddress string
+	RunAddress string `env:"RUN_ADDRESS"`
 	// DatabaseURI — строка подключения к PostgreSQL (флаг -d, env DATABASE_URI).
-	DatabaseURI string
+	DatabaseURI string `env:"DATABASE_URI"`
 	// AccrualSystemAddress — адрес системы расчёта начислений (флаг -r, env ACCRUAL_SYSTEM_ADDRESS).
-	AccrualSystemAddress string
+	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	// LogLevel — уровень логирования: debug, info, warn, error (флаг -log-level, env LOG_LEVEL).
-	LogLevel string
+	LogLevel string `env:"LOG_LEVEL"`
 	// LogFormat — формат логов: json или console (флаг -log-format, env LOG_FORMAT).
-	LogFormat string
+	LogFormat string `env:"LOG_FORMAT"`
 }
 
 // New собирает конфигурацию в три этапа:
 //  1. Дефолтные значения
 //  2. Переменные окружения (перекрывают дефолты)
 //  3. Флаги командной строки (перекрывают всё)
-func New() *Config {
+func New() (*Config, error) {
 	// 1. Дефолты
 	cfg := &Config{
 		RunAddress:           ":8080",
@@ -35,21 +36,11 @@ func New() *Config {
 		LogFormat:            "console",
 	}
 
-	// 2. Переменные окружения
-	if v := os.Getenv("RUN_ADDRESS"); v != "" {
-		cfg.RunAddress = v
-	}
-	if v := os.Getenv("DATABASE_URI"); v != "" {
-		cfg.DatabaseURI = v
-	}
-	if v := os.Getenv("ACCRUAL_SYSTEM_ADDRESS"); v != "" {
-		cfg.AccrualSystemAddress = v
-	}
-	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		cfg.LogLevel = v
-	}
-	if v := os.Getenv("LOG_FORMAT"); v != "" {
-		cfg.LogFormat = v
+	//2. Парсим конфиг из ОС
+	err := parseEnv(cfg)
+
+	if err != nil {
+		return nil, err
 	}
 
 	// 3. Флаги командной строки
@@ -60,5 +51,9 @@ func New() *Config {
 	flag.StringVar(&cfg.LogFormat, "log-format", cfg.LogFormat, "формат логов (json/console)")
 	flag.Parse()
 
-	return cfg
+	return cfg, nil
+}
+
+func parseEnv(cfg *Config) error {
+	return env.Parse(cfg)
 }
