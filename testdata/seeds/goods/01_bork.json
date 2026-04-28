@@ -1,0 +1,5 @@
+{
+  "match": "Bork",
+  "reward": 10,
+  "reward_type": "%"
+}

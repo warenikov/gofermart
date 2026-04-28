@@ -21,3 +21,9 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Артефакты сборки
+bin/
+
+# Swagger (генерируется)
+docs/
