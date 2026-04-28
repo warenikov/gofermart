@@ -1,5 +1,5 @@
-// Package config загружает конфигурацию сервиса из флагов командной строки и переменных окружения.
-// Флаги имеют приоритет над переменными окружения.
+// Package config загружает конфигурацию сервиса.
+// Приоритет: дефолты → переменные окружения → флаги командной строки.
 package config
 
 import (
@@ -21,16 +21,38 @@ type Config struct {
 	LogFormat string
 }
 
-// New читает конфигурацию: сначала переменные окружения, затем флаги (флаги имеют приоритет).
+// New собирает конфигурацию в три этапа:
+//  1. Дефолтные значения
+//  2. Переменные окружения (перекрывают дефолты)
+//  3. Флаги командной строки (перекрывают всё)
 func New() *Config {
+	// 1. Дефолты
 	cfg := &Config{
-		RunAddress:           getEnv("RUN_ADDRESS", ":8080"),
-		DatabaseURI:          getEnv("DATABASE_URI", ""),
-		AccrualSystemAddress: getEnv("ACCRUAL_SYSTEM_ADDRESS", ""),
-		LogLevel:             getEnv("LOG_LEVEL", "info"),
-		LogFormat:            getEnv("LOG_FORMAT", "json"),
+		RunAddress:           ":8080",
+		DatabaseURI:          "",
+		AccrualSystemAddress: "",
+		LogLevel:             "info",
+		LogFormat:            "console",
 	}
 
+	// 2. Переменные окружения
+	if v := os.Getenv("RUN_ADDRESS"); v != "" {
+		cfg.RunAddress = v
+	}
+	if v := os.Getenv("DATABASE_URI"); v != "" {
+		cfg.DatabaseURI = v
+	}
+	if v := os.Getenv("ACCRUAL_SYSTEM_ADDRESS"); v != "" {
+		cfg.AccrualSystemAddress = v
+	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.LogLevel = v
+	}
+	if v := os.Getenv("LOG_FORMAT"); v != "" {
+		cfg.LogFormat = v
+	}
+
+	// 3. Флаги командной строки
 	flag.StringVar(&cfg.RunAddress, "a", cfg.RunAddress, "адрес и порт запуска сервиса")
 	flag.StringVar(&cfg.DatabaseURI, "d", cfg.DatabaseURI, "адрес подключения к базе данных")
 	flag.StringVar(&cfg.AccrualSystemAddress, "r", cfg.AccrualSystemAddress, "адрес системы расчёта начислений")
@@ -39,11 +61,4 @@ func New() *Config {
 	flag.Parse()
 
 	return cfg
-}
-
-func getEnv(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultVal
 }
