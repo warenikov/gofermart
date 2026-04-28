@@ -1,0 +1,7 @@
+{
+  "order": "7000000003",
+  "goods": [
+    {"description": "Ноутбук Lenovo ThinkPad X1", "price": 180000},
+    {"description": "Сумка Lenovo для ноутбука", "price": 4000}
+  ]
+}

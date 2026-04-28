@@ -1,0 +1,8 @@
+{
+  "order": "2024010033",
+  "goods": [
+    {"description": "Холодильник Bosch KGN56", "price": 95000},
+    {"description": "Стиральная машина Bosch WAX32", "price": 75000},
+    {"description": "Посудомойка Bosch SMS4HVI33E", "price": 45000}
+  ]
+}

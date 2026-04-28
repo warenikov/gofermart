@@ -1,0 +1,7 @@
+{
+  "order": "1000000009",
+  "goods": [
+    {"description": "iPhone 15 Apple", "price": 90000},
+    {"description": "AirPods Apple Pro", "price": 20000}
+  ]
+}

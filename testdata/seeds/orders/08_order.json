@@ -1,0 +1,7 @@
+{
+  "order": "5000000005",
+  "goods": [
+    {"description": "Смартфон Xiaomi 14 Pro", "price": 65000},
+    {"description": "Наушники Xiaomi Buds 4", "price": 5000}
+  ]
+}

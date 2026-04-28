@@ -1,0 +1,7 @@
+{
+  "order": "9000000001",
+  "goods": [
+    {"description": "Special Edition набор", "price": 2500},
+    {"description": "Чайник Bork K812", "price": 15000}
+  ]
+}
