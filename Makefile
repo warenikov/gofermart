@@ -16,7 +16,6 @@ endif
 ACCRUAL_HOST := localhost
 ACCRUAL_PORT := 8081
 ACCRUAL_URL  := http://$(ACCRUAL_HOST):$(ACCRUAL_PORT)
-ACCRUAL_DB   := postgresql://postgres:postgres@localhost:5432/gofermart?sslmode=disable
 
 TEST_DB_URI  := postgresql://postgres:postgres@localhost:5433/gofermart_test?sslmode=disable
 
@@ -53,10 +52,10 @@ docker-up:
 docker-down:
 	docker compose down -v
 
-## accrual-start: запустить бинарь accrual локально
+## accrual-start: запустить бинарь accrual локально (хранит данные in-memory, БД не нужна)
 accrual-start:
 	@chmod +x $(ACCRUAL_BINARY)
-	$(ACCRUAL_BINARY) -a $(ACCRUAL_HOST):$(ACCRUAL_PORT) -d $(ACCRUAL_DB)
+	$(ACCRUAL_BINARY) -a $(ACCRUAL_HOST):$(ACCRUAL_PORT)
 
 ## seed-goods: зарегистрировать механики вознаграждений в accrual
 seed-goods:
