@@ -36,7 +36,7 @@ func New() (*Config, error) {
 		LogFormat:            "console",
 	}
 
-	//2. Парсим конфиг из ОС
+	// 2. Парсим конфиг из ОС
 	err := parseEnv(cfg)
 
 	if err != nil {

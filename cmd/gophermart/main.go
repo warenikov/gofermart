@@ -3,19 +3,14 @@ package main
 
 import (
 	"context"
-	"errors"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"go.uber.org/zap"
 
 	"github.com/warenikov/gofermart/internal/config"
 	"github.com/warenikov/gofermart/internal/logger"
+	"github.com/warenikov/gofermart/internal/repository"
+	"github.com/warenikov/gofermart/internal/server"
 )
 
 func main() {
@@ -32,42 +27,31 @@ func main() {
 
 	mainLog := logger.For(log, "main")
 
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
-
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	srv := &http.Server{
-		Addr:         cfg.RunAddress,
-		Handler:      r,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	if cfg.DatabaseURI == "" {
+		mainLog.Fatal("DATABASE_URI не задан, сервис не может запуститься")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go func() {
-		mainLog.Info("сервер запущен", zap.String("addr", cfg.RunAddress))
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			mainLog.Fatal("ошибка запуска сервера", zap.Error(err))
-		}
-	}()
+	if err := repository.ApplyMigrations(cfg.DatabaseURI); err != nil {
+		mainLog.Fatal("ошибка применения миграций", logger.Err(err))
+	}
+	mainLog.Info("миграции применены")
 
-	<-ctx.Done()
-	mainLog.Info("получен сигнал завершения, останавливаем сервер")
+	pool, err := repository.NewPool(ctx, cfg.DatabaseURI)
+	if err != nil {
+		mainLog.Fatal("ошибка подключения к БД", logger.Err(err))
+	}
+	defer pool.Close()
+	mainLog.Info("подключение к БД установлено")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		mainLog.Error("ошибка graceful shutdown", zap.Error(err))
+	srv, err := server.New(server.Config{Addr: cfg.RunAddress}, logger.For(log, "server"))
+	if err != nil {
+		mainLog.Fatal("ошибка инициализации сервера", logger.Err(err))
 	}
 
-	mainLog.Info("сервер остановлен")
+	if err := srv.Run(ctx); err != nil {
+		mainLog.Fatal("ошибка работы сервера", logger.Err(err))
+	}
 }

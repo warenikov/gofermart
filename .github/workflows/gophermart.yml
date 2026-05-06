@@ -26,6 +26,17 @@ jobs:
       - name: Run linter
         run: golangci-lint run ./...
 
+  unit-test:
+    runs-on: ubuntu-latest
+    container: golang:1.26
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run unit tests with race detector
+        run: go test -race -count=1 ./...
+
   build:
     runs-on: ubuntu-latest
     container: golang:1.26
