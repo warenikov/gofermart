@@ -4,6 +4,7 @@ package config
 
 import (
 	"flag"
+	"time"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -20,6 +21,11 @@ type Config struct {
 	LogLevel string `env:"LOG_LEVEL"`
 	// LogFormat — формат логов: json или console (флаг -log-format, env LOG_FORMAT).
 	LogFormat string `env:"LOG_FORMAT"`
+	// JWTSecret — секрет для подписи JWT-токенов (флаг -jwt-secret, env JWT_SECRET).
+	// Обязателен — без него сервис не стартует.
+	JWTSecret string `env:"JWT_SECRET"`
+	// JWTTTL — время жизни JWT-токена (флаг -jwt-ttl, env JWT_TTL).
+	JWTTTL time.Duration `env:"JWT_TTL"`
 }
 
 // New собирает конфигурацию в три этапа:
@@ -34,6 +40,8 @@ func New() (*Config, error) {
 		AccrualSystemAddress: "",
 		LogLevel:             "info",
 		LogFormat:            "console",
+		JWTSecret:            "",
+		JWTTTL:               24 * time.Hour,
 	}
 
 	// 2. Парсим конфиг из ОС
@@ -49,6 +57,8 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.AccrualSystemAddress, "r", cfg.AccrualSystemAddress, "адрес системы расчёта начислений")
 	flag.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "уровень логирования (debug/info/warn/error)")
 	flag.StringVar(&cfg.LogFormat, "log-format", cfg.LogFormat, "формат логов (json/console)")
+	flag.StringVar(&cfg.JWTSecret, "jwt-secret", cfg.JWTSecret, "секрет для подписи JWT")
+	flag.DurationVar(&cfg.JWTTTL, "jwt-ttl", cfg.JWTTTL, "время жизни JWT-токена")
 	flag.Parse()
 
 	return cfg, nil
