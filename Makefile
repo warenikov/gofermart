@@ -91,7 +91,7 @@ test-integration:
 	docker compose -f docker-compose.test.yml up -d
 	@echo "Ждём готовности PostgreSQL..."
 	@until docker compose -f docker-compose.test.yml exec -T db pg_isready -U postgres; do sleep 1; done
-	DATABASE_URI="$(TEST_DB_URI)" go test -race -count=1 -tags=integration ./...
+	DATABASE_URI="$(TEST_DB_URI)" go test -race -count=1 -p=1 -tags=integration ./...
 	docker compose -f docker-compose.test.yml down -v
 
 ## test-all: запустить все тесты
