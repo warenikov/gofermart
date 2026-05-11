@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,18 +48,29 @@ func (r *WithdrawalRepository) GetBalance(ctx context.Context, userID int64) (do
 }
 
 // Withdraw атомарно проверяет баланс и регистрирует списание.
-// Использует SERIALIZABLE-транзакцию, чтобы избежать гонок.
+// Корректность не зависит от уровня изоляции: строка пользователя блокируется
+// через SELECT ... FOR UPDATE на время транзакции — параллельные Withdraw
+// на одного user_id сериализуются, на разных пользователей идут параллельно.
 func (r *WithdrawalRepository) Withdraw(
 	ctx context.Context,
 	userID int64,
 	orderNumber string,
 	sum decimal.Decimal,
 ) error {
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return r.errIn("tx_begin").With("user_id", userID).Wrapf(err, "открыть транзакцию списания")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	const lockUserQ = `SELECT 1 FROM ` + TableUsers + ` WHERE id = $1 FOR UPDATE`
+	var dummy int
+	if err := tx.QueryRow(ctx, lockUserQ, userID).Scan(&dummy); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return r.errIn("user_not_found").With("user_id", userID).Wrap(domain.ErrUserNotFound)
+		}
+		return r.errIn("lock_user").With("user_id", userID).Wrapf(err, "заблокировать строку пользователя")
+	}
 
 	const balanceQ = `
 		SELECT

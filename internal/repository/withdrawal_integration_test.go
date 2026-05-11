@@ -5,6 +5,8 @@ package repository_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -88,4 +90,79 @@ func TestWithdrawalRepository_ListByUser_Empty(t *testing.T) {
 	list, err := repo.ListByUser(context.Background(), userID)
 	require.NoError(t, err)
 	assert.Empty(t, list)
+}
+
+// TestWithdrawalRepository_Withdraw_NoRaceOnSameUser проверяет, что параллельные
+// Withdraw на одного пользователя при балансе ровно на одно списание дают
+// ровно один успех и N−1 ErrInsufficientFunds — никакого двойного списания.
+// Без блокировки строки пользователя (FOR UPDATE) на уровне READ COMMITTED
+// такой тест поймал бы race и баланс ушёл в минус.
+func TestWithdrawalRepository_Withdraw_NoRaceOnSameUser(t *testing.T) {
+	resetDB(t)
+	userID := createTestUser(t, "alice")
+	orderRepo := repository.NewOrderRepository(testPool)
+	withRepo := repository.NewWithdrawalRepository(testPool)
+	ctx := context.Background()
+
+	require.NoError(t, orderRepo.Create(ctx, "12345678903", userID))
+	require.NoError(t, orderRepo.UpdateStatus(ctx, "12345678903", domain.OrderStatusProcessed,
+		decimal.NullDecimal{Decimal: decimal.NewFromInt(100), Valid: true}))
+
+	const goroutines = 10
+	var (
+		wg                sync.WaitGroup
+		successes         atomic.Int32
+		insufficient      atomic.Int32
+		unexpectedErrors  atomic.Int32
+		start             = make(chan struct{})
+		withdrawalNumbers = []string{
+			"346436439", "100000000008", "12345678903", "79927398713", "49927398716",
+			"6011514433546201", "5555555555554444", "4111111111111111", "30569309025904", "18",
+		}
+	)
+
+	for i := range goroutines {
+		wg.Add(1)
+		go func(orderNum string) {
+			defer wg.Done()
+			<-start
+			err := withRepo.Withdraw(ctx, userID, orderNum, decimal.NewFromInt(100))
+			switch {
+			case err == nil:
+				successes.Add(1)
+			case errors.Is(err, domain.ErrInsufficientFunds):
+				insufficient.Add(1)
+			default:
+				unexpectedErrors.Add(1)
+				t.Errorf("неожиданная ошибка от Withdraw: %v", err)
+			}
+		}(withdrawalNumbers[i])
+	}
+
+	close(start)
+	wg.Wait()
+
+	assert.Equal(t, int32(1), successes.Load(),
+		"должно пройти ровно одно списание, прошло %d", successes.Load())
+	assert.Equal(t, int32(goroutines-1), insufficient.Load(),
+		"остальные %d должны вернуть ErrInsufficientFunds, вернули %d",
+		goroutines-1, insufficient.Load())
+	assert.Zero(t, unexpectedErrors.Load(), "не должно быть неожиданных ошибок")
+
+	balance, err := withRepo.GetBalance(ctx, userID)
+	require.NoError(t, err)
+	assert.True(t, balance.Current.IsZero(),
+		"итоговый баланс должен быть 0, получено %s", balance.Current.String())
+	assert.True(t, balance.Withdrawn.Equal(decimal.NewFromInt(100)),
+		"сумма списаний должна быть 100, получено %s", balance.Withdrawn.String())
+}
+
+func TestWithdrawalRepository_Withdraw_UserNotFound(t *testing.T) {
+	resetDB(t)
+	repo := repository.NewWithdrawalRepository(testPool)
+
+	err := repo.Withdraw(context.Background(), 99999, "12345678903", decimal.NewFromInt(50))
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrUserNotFound),
+		"ожидается ErrUserNotFound, получено: %v", err)
 }

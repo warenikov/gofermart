@@ -38,6 +38,7 @@ type WithdrawalRepository interface {
 	GetBalance(ctx context.Context, userID int64) (Balance, error)
 	// Withdraw атомарно проверяет баланс и регистрирует списание.
 	// ErrInsufficientFunds — на счёте недостаточно средств.
+	// ErrUserNotFound — пользователь был удалён между авторизацией и списанием.
 	Withdraw(ctx context.Context, userID int64, orderNumber string, sum decimal.Decimal) error
 	// ListByUser возвращает все списания пользователя в порядке от свежих к старым.
 	ListByUser(ctx context.Context, userID int64) ([]Withdrawal, error)
