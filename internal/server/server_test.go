@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 func TestNew_EmptyAddr_ReturnsOopsError(t *testing.T) {
 	t.Parallel()
 
-	_, err := New(Config{Addr: ""}, zap.NewNop())
+	_, err := New(Config{Addr: ""}, Deps{}, zap.NewNop())
 	require.Error(t, err)
 
 	var oerr oops.OopsError
@@ -82,7 +82,7 @@ func TestRun_BusyPort_ReturnsListenError(t *testing.T) {
 	defer ln.Close()
 	addr := ln.Addr().String()
 
-	srv, err := New(Config{Addr: addr}, zap.NewNop())
+	srv, err := New(Config{Addr: addr}, Deps{}, zap.NewNop())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -101,7 +101,7 @@ func TestRun_BusyPort_ReturnsListenError(t *testing.T) {
 func startServer(t *testing.T, ctx context.Context, addr string) <-chan error {
 	t.Helper()
 
-	srv, err := New(Config{Addr: addr, ShutdownTimeout: time.Second}, zap.NewNop())
+	srv, err := New(Config{Addr: addr, ShutdownTimeout: time.Second}, Deps{}, zap.NewNop())
 	require.NoError(t, err)
 
 	errCh := make(chan error, 1)

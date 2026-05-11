@@ -7,10 +7,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/warenikov/gofermart/internal/auth"
 	"github.com/warenikov/gofermart/internal/config"
+	authh "github.com/warenikov/gofermart/internal/handler/auth"
 	"github.com/warenikov/gofermart/internal/logger"
 	"github.com/warenikov/gofermart/internal/repository"
 	"github.com/warenikov/gofermart/internal/server"
+	authsvc "github.com/warenikov/gofermart/internal/service/auth"
 )
 
 func main() {
@@ -30,6 +33,9 @@ func main() {
 	if cfg.DatabaseURI == "" {
 		mainLog.Fatal("DATABASE_URI не задан, сервис не может запуститься")
 	}
+	if cfg.JWTSecret == "" {
+		mainLog.Fatal("JWT_SECRET не задан, сервис не может запуститься")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -46,7 +52,20 @@ func main() {
 	defer pool.Close()
 	mainLog.Info("подключение к БД установлено")
 
-	srv, err := server.New(server.Config{Addr: cfg.RunAddress}, logger.For(log, "server"))
+	tokens, err := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL)
+	if err != nil {
+		mainLog.Fatal("ошибка инициализации токен-менеджера", logger.Err(err))
+	}
+
+	userRepo := repository.NewUserRepository(pool)
+	authService := authsvc.NewService(userRepo, tokens, log)
+	authHandler := authh.NewHandler(authService, log)
+
+	srv, err := server.New(
+		server.Config{Addr: cfg.RunAddress},
+		server.Deps{Auth: authHandler},
+		logger.For(log, "server"),
+	)
 	if err != nil {
 		mainLog.Fatal("ошибка инициализации сервера", logger.Err(err))
 	}

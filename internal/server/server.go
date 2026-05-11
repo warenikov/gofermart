@@ -36,7 +36,8 @@ type Server struct {
 
 // New собирает HTTP-сервер с маршрутами и middleware.
 // Адрес обязателен; остальные таймауты — дефолтные, если не заданы.
-func New(cfg Config, log *zap.Logger) (*Server, error) {
+// Deps содержит внешние хендлеры — nil-зависимости просто не регистрируются.
+func New(cfg Config, deps Deps, log *zap.Logger) (*Server, error) {
 	if cfg.Addr == "" {
 		return nil, oops.In("server").Code("invalid_config").Errorf("адрес HTTP-сервера не задан")
 	}
@@ -46,7 +47,7 @@ func New(cfg Config, log *zap.Logger) (*Server, error) {
 	return &Server{
 		httpSrv: &http.Server{
 			Addr:         cfg.Addr,
-			Handler:      newRouter(),
+			Handler:      newRouter(deps),
 			ReadTimeout:  cfg.ReadTimeout,
 			WriteTimeout: cfg.WriteTimeout,
 			IdleTimeout:  cfg.IdleTimeout,
