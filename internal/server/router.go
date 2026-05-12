@@ -29,6 +29,8 @@ func newRouter(deps Deps, log *zap.Logger) http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
+	r.Use(chimw.Compress(5))
+	r.Use(mw.DecompressGzip)
 
 	r.Get("/health", health)
 
