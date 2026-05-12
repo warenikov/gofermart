@@ -30,6 +30,8 @@ linters:
       scope: declarations
       capital: true
   exclusions:
+    paths:
+      - docs
     rules:
       - path: _test\.go
         linters:

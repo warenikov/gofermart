@@ -39,6 +39,20 @@ const maxBodyBytes = 1024
 
 // Submit обрабатывает POST /api/user/orders.
 // Body — text/plain c номером заказа.
+//
+//	@Summary	Загрузка номера заказа
+//	@Tags		orders
+//	@Accept		plain
+//	@Param		number	body	string	true	"Номер заказа"
+//	@Success	200		"Заказ уже загружен этим пользователем"
+//	@Success	202		"Новый заказ принят в обработку"
+//	@Failure	400		"Пустое тело запроса"
+//	@Failure	401		"Пользователь не аутентифицирован"
+//	@Failure	409		"Заказ загружен другим пользователем"
+//	@Failure	422		"Неверный формат номера заказа (Луна)"
+//	@Failure	500		"Внутренняя ошибка сервера"
+//	@Security	BearerAuth
+//	@Router		/api/user/orders [post]
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
@@ -73,6 +87,16 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 }
 
 // List обрабатывает GET /api/user/orders.
+//
+//	@Summary	Список заказов пользователя
+//	@Tags		orders
+//	@Produce	json
+//	@Success	200	{array}	orderDTO	"Список заказов в порядке от свежих к старым"
+//	@Success	204	"Нет данных"
+//	@Failure	401	"Пользователь не авторизован"
+//	@Failure	500	"Внутренняя ошибка сервера"
+//	@Security	BearerAuth
+//	@Router		/api/user/orders [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {

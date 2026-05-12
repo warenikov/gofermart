@@ -25,5 +25,6 @@ vendor/
 # Артефакты сборки
 bin/
 
-# Swagger (генерируется)
-docs/
+# Swagger (генерируется; коммитим, чтобы сборка не требовала swag CLI)
+docs/swagger.json
+docs/swagger.yaml

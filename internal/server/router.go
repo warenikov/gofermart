@@ -5,8 +5,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 
+	_ "github.com/warenikov/gofermart/docs" // регистрирует swagger spec
 	authh "github.com/warenikov/gofermart/internal/handler/auth"
 	balanceh "github.com/warenikov/gofermart/internal/handler/balance"
 	orderh "github.com/warenikov/gofermart/internal/handler/order"
@@ -33,6 +35,7 @@ func newRouter(deps Deps, log *zap.Logger) http.Handler {
 	r.Use(mw.DecompressGzip)
 
 	r.Get("/health", health)
+	r.Get("/swagger/*", httpSwagger.Handler())
 
 	r.Route("/api/user", func(r chi.Router) {
 		if deps.Auth != nil {

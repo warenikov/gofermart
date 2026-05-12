@@ -41,6 +41,18 @@ func NewHandler(svc Service, log *zap.Logger) *Handler {
 }
 
 // Register обрабатывает POST /api/user/register.
+//
+//	@Summary	Регистрация пользователя
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		credentials	body		credentials		true	"Логин и пароль"
+//	@Success	200			{object}	authResponse	"Успех; токен в заголовке Authorization и теле"
+//	@Header		200			{string}	Authorization	"Bearer <token>"
+//	@Failure	400			"Неверный формат запроса"
+//	@Failure	409			"Логин уже занят"
+//	@Failure	500			"Внутренняя ошибка сервера"
+//	@Router		/api/user/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	creds, ok := decodeCreds(w, r)
 	if !ok {
@@ -55,6 +67,18 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login обрабатывает POST /api/user/login.
+//
+//	@Summary	Аутентификация пользователя
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		credentials	body		credentials		true	"Логин и пароль"
+//	@Success	200			{object}	authResponse	"Успех; токен в заголовке Authorization и теле"
+//	@Header		200			{string}	Authorization	"Bearer <token>"
+//	@Failure	400			"Неверный формат запроса"
+//	@Failure	401			"Неверная пара логин/пароль"
+//	@Failure	500			"Внутренняя ошибка сервера"
+//	@Router		/api/user/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	creds, ok := decodeCreds(w, r)
 	if !ok {

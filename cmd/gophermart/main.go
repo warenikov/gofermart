@@ -1,4 +1,13 @@
 // Package main — точка входа сервиса накопительной системы лояльности «Гофермарт».
+//
+//	@title						Gofermart API
+//	@version					1.0
+//	@description				Накопительная система лояльности «Гофермарт».
+//	@BasePath					/
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Заголовок вида "Bearer <token>" из ответа /api/user/register или /api/user/login.
 package main
 
 import (

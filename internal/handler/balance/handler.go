@@ -36,6 +36,15 @@ func NewHandler(svc Service, log *zap.Logger) *Handler {
 }
 
 // Get обрабатывает GET /api/user/balance.
+//
+//	@Summary	Текущий баланс пользователя
+//	@Tags		balance
+//	@Produce	json
+//	@Success	200	{object}	balanceDTO	"Текущий баланс и сумма всех списаний"
+//	@Failure	401	"Пользователь не авторизован"
+//	@Failure	500	"Внутренняя ошибка сервера"
+//	@Security	BearerAuth
+//	@Router		/api/user/balance [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
@@ -59,6 +68,19 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Withdraw обрабатывает POST /api/user/balance/withdraw.
+//
+//	@Summary	Списание баллов в счёт оплаты заказа
+//	@Tags		balance
+//	@Accept		json
+//	@Param		withdraw	body	withdrawRequest	true	"Номер заказа и сумма к списанию"
+//	@Success	200			"Списание зафиксировано"
+//	@Failure	400			"Неверный формат запроса"
+//	@Failure	401			"Пользователь не авторизован"
+//	@Failure	402			"Недостаточно средств на счёте"
+//	@Failure	422			"Неверный номер заказа (Луна)"
+//	@Failure	500			"Внутренняя ошибка сервера"
+//	@Security	BearerAuth
+//	@Router		/api/user/balance/withdraw [post]
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
@@ -94,6 +116,16 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListWithdrawals обрабатывает GET /api/user/withdrawals.
+//
+//	@Summary	Список списаний пользователя
+//	@Tags		balance
+//	@Produce	json
+//	@Success	200	{array}	withdrawalDTO	"Список списаний в порядке от свежих к старым"
+//	@Success	204	"Нет ни одного списания"
+//	@Failure	401	"Пользователь не авторизован"
+//	@Failure	500	"Внутренняя ошибка сервера"
+//	@Security	BearerAuth
+//	@Router		/api/user/withdrawals [get]
 func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
