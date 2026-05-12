@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,11 +43,16 @@ func main() {
 	if cfg.DatabaseURI == "" {
 		mainLog.Fatal("DATABASE_URI не задан, сервис не может запуститься")
 	}
-	if cfg.JWTSecret == "" {
-		mainLog.Fatal("JWT_SECRET не задан, сервис не может запуститься")
-	}
 	if cfg.AccrualSystemAddress == "" {
 		mainLog.Fatal("ACCRUAL_SYSTEM_ADDRESS не задан, сервис не может запуститься")
+	}
+	if cfg.JWTSecret == "" {
+		generated, err := randomSecret(32)
+		if err != nil {
+			mainLog.Fatal("не удалось сгенерировать JWT-секрет", logger.Err(err))
+		}
+		cfg.JWTSecret = generated
+		mainLog.Warn("JWT_SECRET не задан, сгенерирован случайный — токены не переживут рестарт сервиса")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -107,4 +114,13 @@ func main() {
 		mainLog.Fatal("сервис завершился с ошибкой", logger.Err(err))
 	}
 	mainLog.Info("сервис остановлен")
+}
+
+// randomSecret возвращает hex-строку из n случайных байт.
+func randomSecret(n int) (string, error) {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
