@@ -7,13 +7,21 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/warenikov/gofermart/internal/accrual"
 	"github.com/warenikov/gofermart/internal/auth"
 	"github.com/warenikov/gofermart/internal/config"
 	authh "github.com/warenikov/gofermart/internal/handler/auth"
+	balanceh "github.com/warenikov/gofermart/internal/handler/balance"
+	orderh "github.com/warenikov/gofermart/internal/handler/order"
 	"github.com/warenikov/gofermart/internal/logger"
 	"github.com/warenikov/gofermart/internal/repository"
 	"github.com/warenikov/gofermart/internal/server"
 	authsvc "github.com/warenikov/gofermart/internal/service/auth"
+	balancesvc "github.com/warenikov/gofermart/internal/service/balance"
+	ordersvc "github.com/warenikov/gofermart/internal/service/order"
 )
 
 func main() {
@@ -35,6 +43,9 @@ func main() {
 	}
 	if cfg.JWTSecret == "" {
 		mainLog.Fatal("JWT_SECRET не задан, сервис не может запуститься")
+	}
+	if cfg.AccrualSystemAddress == "" {
+		mainLog.Fatal("ACCRUAL_SYSTEM_ADDRESS не задан, сервис не может запуститься")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -58,19 +69,42 @@ func main() {
 	}
 
 	userRepo := repository.NewUserRepository(pool)
+	orderRepo := repository.NewOrderRepository(pool)
+	withdrawalRepo := repository.NewWithdrawalRepository(pool)
+
 	authService := authsvc.NewService(userRepo, tokens, log)
+	orderService := ordersvc.NewService(orderRepo, log)
+	balanceService := balancesvc.NewService(withdrawalRepo, log)
+
 	authHandler := authh.NewHandler(authService, log)
+	orderHandler := orderh.NewHandler(orderService, log)
+	balanceHandler := balanceh.NewHandler(balanceService, log)
+
+	accrualClient := accrual.New(cfg.AccrualSystemAddress, 0)
+	worker := accrual.NewWorker(accrualClient, orderRepo, accrual.WorkerConfig{}, log)
 
 	srv, err := server.New(
 		server.Config{Addr: cfg.RunAddress},
-		server.Deps{Auth: authHandler},
+		server.Deps{
+			Auth:        authHandler,
+			Order:       orderHandler,
+			Balance:     balanceHandler,
+			TokenParser: tokens,
+		},
 		logger.For(log, "server"),
 	)
 	if err != nil {
 		mainLog.Fatal("ошибка инициализации сервера", logger.Err(err))
 	}
 
-	if err := srv.Run(ctx); err != nil {
-		mainLog.Fatal("ошибка работы сервера", logger.Err(err))
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error { return srv.Run(gCtx) })
+	g.Go(func() error { return worker.Run(gCtx) })
+
+	mainLog.Info("сервис запущен", zap.String("addr", cfg.RunAddress))
+
+	if err := g.Wait(); err != nil {
+		mainLog.Fatal("сервис завершился с ошибкой", logger.Err(err))
 	}
+	mainLog.Info("сервис остановлен")
 }

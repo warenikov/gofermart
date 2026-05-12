@@ -47,7 +47,7 @@ func New(cfg Config, deps Deps, log *zap.Logger) (*Server, error) {
 	return &Server{
 		httpSrv: &http.Server{
 			Addr:         cfg.Addr,
-			Handler:      newRouter(deps),
+			Handler:      newRouter(deps, log),
 			ReadTimeout:  cfg.ReadTimeout,
 			WriteTimeout: cfg.WriteTimeout,
 			IdleTimeout:  cfg.IdleTimeout,
