@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS orders (
-    number      TEXT          PRIMARY KEY,
+    number      VARCHAR(64)   PRIMARY KEY,
     user_id     BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status      VARCHAR(16)   NOT NULL DEFAULT 'NEW'
                               CHECK (status IN ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED')),

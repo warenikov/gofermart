@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository_test
+package repository
 
 import (
 	"context"
@@ -10,8 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-
-	"github.com/warenikov/gofermart/internal/repository"
 )
 
 var testPool *pgxpool.Pool
@@ -23,11 +21,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	if err := repository.ApplyMigrations(dsn); err != nil {
-		log.Fatalf("ошибка миграций: %v", err)
-	}
-
-	pool, err := repository.NewPool(context.Background(), dsn)
+	pool, err := NewPool(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("ошибка подключения к БД: %v", err)
 	}
@@ -42,9 +36,9 @@ func TestMain(m *testing.M) {
 func resetDB(t *testing.T) {
 	t.Helper()
 	const truncateAll = `TRUNCATE ` +
-		repository.TableWithdrawals + `, ` +
-		repository.TableOrders + `, ` +
-		repository.TableUsers +
+		tableWithdrawals + `, ` +
+		tableOrders + `, ` +
+		tableUsers +
 		` RESTART IDENTITY CASCADE`
 	_, err := testPool.Exec(context.Background(), truncateAll)
 	require.NoError(t, err)

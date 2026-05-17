@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository_test
+package repository
 
 import (
 	"context"
@@ -11,12 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/warenikov/gofermart/internal/domain"
-	"github.com/warenikov/gofermart/internal/repository"
 )
 
 func TestUserRepository_Create_GetByLogin_GetByID(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewUserRepository(testPool)
+	repo := NewUserRepository(testPool)
 	ctx := context.Background()
 
 	created, err := repo.Create(ctx, "alice", "hashed-password")
@@ -37,7 +36,7 @@ func TestUserRepository_Create_GetByLogin_GetByID(t *testing.T) {
 
 func TestUserRepository_Create_DuplicateLogin(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewUserRepository(testPool)
+	repo := NewUserRepository(testPool)
 	ctx := context.Background()
 
 	_, err := repo.Create(ctx, "bob", "hash1")
@@ -51,7 +50,7 @@ func TestUserRepository_Create_DuplicateLogin(t *testing.T) {
 
 func TestUserRepository_GetByLogin_NotFound(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewUserRepository(testPool)
+	repo := NewUserRepository(testPool)
 
 	_, err := repo.GetByLogin(context.Background(), "nobody")
 	require.Error(t, err)
@@ -60,7 +59,7 @@ func TestUserRepository_GetByLogin_NotFound(t *testing.T) {
 
 func TestUserRepository_GetByID_NotFound(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewUserRepository(testPool)
+	repo := NewUserRepository(testPool)
 
 	_, err := repo.GetByID(context.Background(), 99999)
 	require.Error(t, err)

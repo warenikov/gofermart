@@ -30,7 +30,7 @@ func (r *UserRepository) errIn(code string) oops.OopsErrorBuilder {
 // Create сохраняет нового пользователя.
 func (r *UserRepository) Create(ctx context.Context, login, passwordHash string) (*domain.User, error) {
 	const q = `
-		INSERT INTO ` + TableUsers + ` (login, password_hash)
+		INSERT INTO ` + tableUsers + ` (login, password_hash)
 		VALUES ($1, $2)
 		RETURNING id, login, password_hash, created_at`
 
@@ -49,7 +49,7 @@ func (r *UserRepository) Create(ctx context.Context, login, passwordHash string)
 
 // GetByLogin возвращает пользователя по логину.
 func (r *UserRepository) GetByLogin(ctx context.Context, login string) (*domain.User, error) {
-	const q = `SELECT id, login, password_hash, created_at FROM ` + TableUsers + ` WHERE login = $1`
+	const q = `SELECT id, login, password_hash, created_at FROM ` + tableUsers + ` WHERE login = $1`
 
 	var u domain.User
 	err := r.pool.QueryRow(ctx, q, login).
@@ -65,7 +65,7 @@ func (r *UserRepository) GetByLogin(ctx context.Context, login string) (*domain.
 
 // GetByID возвращает пользователя по идентификатору.
 func (r *UserRepository) GetByID(ctx context.Context, id int64) (*domain.User, error) {
-	const q = `SELECT id, login, password_hash, created_at FROM ` + TableUsers + ` WHERE id = $1`
+	const q = `SELECT id, login, password_hash, created_at FROM ` + tableUsers + ` WHERE id = $1`
 
 	var u domain.User
 	err := r.pool.QueryRow(ctx, q, id).

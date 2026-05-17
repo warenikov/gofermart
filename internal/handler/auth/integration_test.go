@@ -35,9 +35,6 @@ func TestMain(m *testing.M) {
 		log.Println("DATABASE_URI не задан — интеграционные тесты auth пропущены")
 		os.Exit(0)
 	}
-	if err := repository.ApplyMigrations(dsn); err != nil {
-		log.Fatalf("ошибка миграций: %v", err)
-	}
 	pool, err := repository.NewPool(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("ошибка подключения к БД: %v", err)
@@ -50,11 +47,7 @@ func TestMain(m *testing.M) {
 
 func resetDB(t *testing.T) {
 	t.Helper()
-	const q = `TRUNCATE ` +
-		repository.TableWithdrawals + `, ` +
-		repository.TableOrders + `, ` +
-		repository.TableUsers +
-		` RESTART IDENTITY CASCADE`
+	const q = `TRUNCATE withdrawals, orders, users RESTART IDENTITY CASCADE`
 	_, err := testPool.Exec(context.Background(), q)
 	require.NoError(t, err)
 }

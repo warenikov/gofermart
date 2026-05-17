@@ -7,7 +7,8 @@ import (
 	"github.com/samber/oops"
 )
 
-// NewPool создаёт и пингует пул соединений pgx/v5.
+// NewPool создаёт пул соединений pgx/v5, пингует БД и применяет встроенные миграции.
+// Миграции применяются до возврата пула — потребитель получает БД, готовую к работе.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -22,6 +23,11 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, oops.In("repository.postgres").Code("ping").Wrapf(err, "проверить доступность БД")
+	}
+
+	if err := applyMigrations(dsn); err != nil {
+		pool.Close()
+		return nil, err
 	}
 
 	return pool, nil

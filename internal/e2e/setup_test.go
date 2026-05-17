@@ -37,9 +37,6 @@ func TestMain(m *testing.M) {
 		log.Println("DATABASE_URI не задан — e2e тесты пропущены")
 		os.Exit(0)
 	}
-	if err := repository.ApplyMigrations(dsn); err != nil {
-		log.Fatalf("ошибка миграций: %v", err)
-	}
 	pool, err := repository.NewPool(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("ошибка подключения к БД: %v", err)
@@ -52,11 +49,7 @@ func TestMain(m *testing.M) {
 
 func resetDB(t *testing.T) {
 	t.Helper()
-	const q = `TRUNCATE ` +
-		repository.TableWithdrawals + `, ` +
-		repository.TableOrders + `, ` +
-		repository.TableUsers +
-		` RESTART IDENTITY CASCADE`
+	const q = `TRUNCATE withdrawals, orders, users RESTART IDENTITY CASCADE`
 	_, err := testPool.Exec(context.Background(), q)
 	require.NoError(t, err)
 }
@@ -94,7 +87,7 @@ func startTestApp(t *testing.T, accrualHandler http.HandlerFunc, poller bool) *t
 	orderHandler := orderh.NewHandler(orderService, zap.NewNop())
 	balanceHandler := balanceh.NewHandler(balanceService, zap.NewNop())
 
-	client := accrual.New(mockAccrual.URL, time.Second)
+	client := accrual.New(mockAccrual.URL, time.Second, nil)
 	worker := accrual.NewWorker(client, orderRepo, accrual.WorkerConfig{
 		PollInterval: 20 * time.Millisecond,
 		Workers:      2,

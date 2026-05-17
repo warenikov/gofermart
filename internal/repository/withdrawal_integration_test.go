@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository_test
+package repository
 
 import (
 	"context"
@@ -14,13 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/warenikov/gofermart/internal/domain"
-	"github.com/warenikov/gofermart/internal/repository"
 )
 
 func TestWithdrawalRepository_GetBalance_EmptyUser(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewWithdrawalRepository(testPool)
+	repo := NewWithdrawalRepository(testPool)
 
 	balance, err := repo.GetBalance(context.Background(), userID)
 	require.NoError(t, err)
@@ -31,7 +30,7 @@ func TestWithdrawalRepository_GetBalance_EmptyUser(t *testing.T) {
 func TestWithdrawalRepository_Withdraw_InsufficientFunds(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewWithdrawalRepository(testPool)
+	repo := NewWithdrawalRepository(testPool)
 
 	err := repo.Withdraw(context.Background(), userID, "12345678903", decimal.NewFromInt(100))
 	require.Error(t, err)
@@ -42,8 +41,8 @@ func TestWithdrawalRepository_Withdraw_InsufficientFunds(t *testing.T) {
 func TestWithdrawalRepository_Withdraw_ReducesBalance(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	orderRepo := repository.NewOrderRepository(testPool)
-	withRepo := repository.NewWithdrawalRepository(testPool)
+	orderRepo := NewOrderRepository(testPool)
+	withRepo := NewWithdrawalRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, orderRepo.Create(ctx, "12345678903", userID))
@@ -66,8 +65,8 @@ func TestWithdrawalRepository_Withdraw_ReducesBalance(t *testing.T) {
 func TestWithdrawalRepository_ListByUser(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	orderRepo := repository.NewOrderRepository(testPool)
-	withRepo := repository.NewWithdrawalRepository(testPool)
+	orderRepo := NewOrderRepository(testPool)
+	withRepo := NewWithdrawalRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, orderRepo.Create(ctx, "12345678903", userID))
@@ -85,7 +84,7 @@ func TestWithdrawalRepository_ListByUser(t *testing.T) {
 func TestWithdrawalRepository_ListByUser_Empty(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewWithdrawalRepository(testPool)
+	repo := NewWithdrawalRepository(testPool)
 
 	list, err := repo.ListByUser(context.Background(), userID)
 	require.NoError(t, err)
@@ -100,8 +99,8 @@ func TestWithdrawalRepository_ListByUser_Empty(t *testing.T) {
 func TestWithdrawalRepository_Withdraw_NoRaceOnSameUser(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	orderRepo := repository.NewOrderRepository(testPool)
-	withRepo := repository.NewWithdrawalRepository(testPool)
+	orderRepo := NewOrderRepository(testPool)
+	withRepo := NewWithdrawalRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, orderRepo.Create(ctx, "12345678903", userID))
@@ -159,7 +158,7 @@ func TestWithdrawalRepository_Withdraw_NoRaceOnSameUser(t *testing.T) {
 
 func TestWithdrawalRepository_Withdraw_UserNotFound(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewWithdrawalRepository(testPool)
+	repo := NewWithdrawalRepository(testPool)
 
 	err := repo.Withdraw(context.Background(), 99999, "12345678903", decimal.NewFromInt(50))
 	require.Error(t, err)

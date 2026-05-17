@@ -68,17 +68,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := repository.ApplyMigrations(cfg.DatabaseURI); err != nil {
-		mainLog.Fatal("ошибка применения миграций", logger.Err(err))
-	}
-	mainLog.Info("миграции применены")
-
 	pool, err := repository.NewPool(ctx, cfg.DatabaseURI)
 	if err != nil {
 		mainLog.Fatal("ошибка подключения к БД", logger.Err(err))
 	}
 	defer pool.Close()
-	mainLog.Info("подключение к БД установлено")
+	mainLog.Info("подключение к БД установлено, миграции применены")
 
 	tokens, err := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL)
 	if err != nil {

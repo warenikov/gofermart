@@ -14,9 +14,9 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// ApplyMigrations прогоняет все миграции до самой свежей версии.
-// Если миграций нет (ErrNoChange) — считается успехом.
-func ApplyMigrations(dsn string) error {
+// applyMigrations прогоняет встроенные SQL-миграции до самой свежей версии.
+// Идемпотентна: ErrNoChange трактуется как успех. Вызывается из [NewPool].
+func applyMigrations(dsn string) error {
 	src, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
 		return oops.In("repository.migrations").Code("iofs_open").Wrapf(err, "открыть встроенные миграции")

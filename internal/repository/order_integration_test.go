@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository_test
+package repository
 
 import (
 	"context"
@@ -12,12 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/warenikov/gofermart/internal/domain"
-	"github.com/warenikov/gofermart/internal/repository"
 )
 
 func createTestUser(t *testing.T, login string) int64 {
 	t.Helper()
-	repo := repository.NewUserRepository(testPool)
+	repo := NewUserRepository(testPool)
 	u, err := repo.Create(context.Background(), login, "hash")
 	require.NoError(t, err)
 	return u.ID
@@ -26,7 +25,7 @@ func createTestUser(t *testing.T, login string) int64 {
 func TestOrderRepository_Create_GetByNumber(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userID))
@@ -43,7 +42,7 @@ func TestOrderRepository_Create_GetByNumber(t *testing.T) {
 func TestOrderRepository_Create_DuplicateSameUser(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userID))
@@ -58,7 +57,7 @@ func TestOrderRepository_Create_DuplicateDifferentUser(t *testing.T) {
 	resetDB(t)
 	userA := createTestUser(t, "alice")
 	userB := createTestUser(t, "bob")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userA))
@@ -72,7 +71,7 @@ func TestOrderRepository_Create_DuplicateDifferentUser(t *testing.T) {
 func TestOrderRepository_ListByUser(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userID))
@@ -86,7 +85,7 @@ func TestOrderRepository_ListByUser(t *testing.T) {
 func TestOrderRepository_ListByUser_Empty(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 
 	orders, err := repo.ListByUser(context.Background(), userID)
 	require.NoError(t, err)
@@ -96,7 +95,7 @@ func TestOrderRepository_ListByUser_Empty(t *testing.T) {
 func TestOrderRepository_UpdateStatus(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userID))
@@ -113,7 +112,7 @@ func TestOrderRepository_UpdateStatus(t *testing.T) {
 
 func TestOrderRepository_UpdateStatus_NotFound(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 
 	err := repo.UpdateStatus(
 		context.Background(),
@@ -128,7 +127,7 @@ func TestOrderRepository_UpdateStatus_NotFound(t *testing.T) {
 func TestOrderRepository_ListUnfinished(t *testing.T) {
 	resetDB(t)
 	userID := createTestUser(t, "alice")
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Create(ctx, "12345678903", userID))
@@ -144,7 +143,7 @@ func TestOrderRepository_ListUnfinished(t *testing.T) {
 
 func TestOrderRepository_GetByNumber_NotFound(t *testing.T) {
 	resetDB(t)
-	repo := repository.NewOrderRepository(testPool)
+	repo := NewOrderRepository(testPool)
 
 	_, err := repo.GetByNumber(context.Background(), "00000000000")
 	require.Error(t, err)

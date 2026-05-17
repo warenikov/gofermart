@@ -31,7 +31,7 @@ func (r *OrderRepository) errIn(code string) oops.OopsErrorBuilder {
 // Create регистрирует заказ за пользователем.
 // Если заказ уже существует — возвращает ErrOrderAlreadyOwned (тот же пользователь) или ErrOrderOwnedByOther.
 func (r *OrderRepository) Create(ctx context.Context, number string, userID int64) error {
-	const q = `INSERT INTO ` + TableOrders + ` (number, user_id) VALUES ($1, $2)`
+	const q = `INSERT INTO ` + tableOrders + ` (number, user_id) VALUES ($1, $2)`
 
 	_, err := r.pool.Exec(ctx, q, number, userID)
 	if err == nil {
@@ -47,7 +47,7 @@ func (r *OrderRepository) Create(ctx context.Context, number string, userID int6
 }
 
 func (r *OrderRepository) resolveExistingOwner(ctx context.Context, number string, userID int64) error {
-	const q = `SELECT user_id FROM ` + TableOrders + ` WHERE number = $1`
+	const q = `SELECT user_id FROM ` + tableOrders + ` WHERE number = $1`
 
 	var existingOwner int64
 	if err := r.pool.QueryRow(ctx, q, number).Scan(&existingOwner); err != nil {
@@ -62,7 +62,7 @@ func (r *OrderRepository) resolveExistingOwner(ctx context.Context, number strin
 
 // GetByNumber возвращает заказ по номеру.
 func (r *OrderRepository) GetByNumber(ctx context.Context, number string) (*domain.Order, error) {
-	const q = `SELECT number, user_id, status, accrual, uploaded_at FROM ` + TableOrders + ` WHERE number = $1`
+	const q = `SELECT number, user_id, status, accrual, uploaded_at FROM ` + tableOrders + ` WHERE number = $1`
 
 	var o domain.Order
 	err := r.pool.QueryRow(ctx, q, number).
@@ -81,7 +81,7 @@ func (r *OrderRepository) GetByNumber(ctx context.Context, number string) (*doma
 func (r *OrderRepository) ListByUser(ctx context.Context, userID int64) ([]domain.Order, error) {
 	const q = `
 		SELECT number, user_id, status, accrual, uploaded_at
-		FROM ` + TableOrders + `
+		FROM ` + tableOrders + `
 		WHERE user_id = $1
 		ORDER BY uploaded_at DESC`
 
@@ -115,7 +115,7 @@ func (r *OrderRepository) UpdateStatus(
 	status domain.OrderStatus,
 	accrual decimal.NullDecimal,
 ) error {
-	const q = `UPDATE ` + TableOrders + ` SET status = $1, accrual = $2 WHERE number = $3`
+	const q = `UPDATE ` + tableOrders + ` SET status = $1, accrual = $2 WHERE number = $3`
 
 	tag, err := r.pool.Exec(ctx, q, status, accrual, number)
 	if err != nil {
@@ -132,7 +132,7 @@ func (r *OrderRepository) UpdateStatus(
 func (r *OrderRepository) ListUnfinished(ctx context.Context, limit int) ([]domain.Order, error) {
 	const q = `
 		SELECT number, user_id, status, accrual, uploaded_at
-		FROM ` + TableOrders + `
+		FROM ` + tableOrders + `
 		WHERE status IN ('NEW', 'PROCESSING')
 		ORDER BY uploaded_at ASC
 		LIMIT $1`

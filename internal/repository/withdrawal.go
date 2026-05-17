@@ -31,9 +31,9 @@ func (r *WithdrawalRepository) errIn(code string) oops.OopsErrorBuilder {
 func (r *WithdrawalRepository) GetBalance(ctx context.Context, userID int64) (domain.Balance, error) {
 	const q = `
 		SELECT
-			COALESCE((SELECT SUM(accrual) FROM ` + TableOrders + `
+			COALESCE((SELECT SUM(accrual) FROM ` + tableOrders + `
 				WHERE user_id = $1 AND status = 'PROCESSED'), 0) AS accrued,
-			COALESCE((SELECT SUM(sum) FROM ` + TableWithdrawals + `
+			COALESCE((SELECT SUM(sum) FROM ` + tableWithdrawals + `
 				WHERE user_id = $1), 0) AS withdrawn`
 
 	var accrued, withdrawn decimal.Decimal
@@ -63,7 +63,7 @@ func (r *WithdrawalRepository) Withdraw(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	const lockUserQ = `SELECT 1 FROM ` + TableUsers + ` WHERE id = $1 FOR UPDATE`
+	const lockUserQ = `SELECT 1 FROM ` + tableUsers + ` WHERE id = $1 FOR UPDATE`
 	var dummy int
 	if err := tx.QueryRow(ctx, lockUserQ, userID).Scan(&dummy); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -74,10 +74,10 @@ func (r *WithdrawalRepository) Withdraw(
 
 	const balanceQ = `
 		SELECT
-			COALESCE((SELECT SUM(accrual) FROM ` + TableOrders + `
+			COALESCE((SELECT SUM(accrual) FROM ` + tableOrders + `
 				WHERE user_id = $1 AND status = 'PROCESSED'), 0)
 			-
-			COALESCE((SELECT SUM(sum) FROM ` + TableWithdrawals + `
+			COALESCE((SELECT SUM(sum) FROM ` + tableWithdrawals + `
 				WHERE user_id = $1), 0) AS balance`
 
 	var balance decimal.Decimal
@@ -95,7 +95,7 @@ func (r *WithdrawalRepository) Withdraw(
 	}
 
 	const insertQ = `
-		INSERT INTO ` + TableWithdrawals + ` (user_id, order_number, sum)
+		INSERT INTO ` + tableWithdrawals + ` (user_id, order_number, sum)
 		VALUES ($1, $2, $3)`
 
 	if _, err := tx.Exec(ctx, insertQ, userID, orderNumber, sum); err != nil {
@@ -114,7 +114,7 @@ func (r *WithdrawalRepository) Withdraw(
 func (r *WithdrawalRepository) ListByUser(ctx context.Context, userID int64) ([]domain.Withdrawal, error) {
 	const q = `
 		SELECT id, user_id, order_number, sum, processed_at
-		FROM ` + TableWithdrawals + `
+		FROM ` + tableWithdrawals + `
 		WHERE user_id = $1
 		ORDER BY processed_at DESC`
 
