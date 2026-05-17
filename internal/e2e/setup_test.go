@@ -15,6 +15,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"go.uber.org/zap"
 
 	"github.com/warenikov/gofermart/internal/accrual"
@@ -32,19 +34,44 @@ import (
 var testPool *pgxpool.Pool
 
 func TestMain(m *testing.M) {
-	dsn := os.Getenv("DATABASE_URI")
-	if dsn == "" {
-		log.Println("DATABASE_URI не задан — e2e тесты пропущены")
-		os.Exit(0)
-	}
-	pool, err := repository.NewPool(context.Background(), dsn)
+	os.Exit(runE2E(m))
+}
+
+func runE2E(m *testing.M) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	pgC, err := postgres.Run(ctx, "postgres:16-alpine",
+		postgres.WithDatabase("gofermart_e2e"),
+		postgres.WithUsername("test"),
+		postgres.WithPassword("test"),
+		postgres.BasicWaitStrategies(),
+	)
 	if err != nil {
-		log.Fatalf("ошибка подключения к БД: %v", err)
+		log.Printf("не удалось поднять postgres-контейнер: %v", err)
+		return 1
 	}
+	defer func() {
+		if err := testcontainers.TerminateContainer(pgC); err != nil {
+			log.Printf("terminate postgres: %v", err)
+		}
+	}()
+
+	dsn, err := pgC.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		log.Printf("DSN postgres: %v", err)
+		return 1
+	}
+
+	pool, err := repository.NewPool(ctx, dsn)
+	if err != nil {
+		log.Printf("ошибка подключения к БД: %v", err)
+		return 1
+	}
+	defer pool.Close()
 	testPool = pool
-	code := m.Run()
-	pool.Close()
-	os.Exit(code)
+
+	return m.Run()
 }
 
 func resetDB(t *testing.T) {
