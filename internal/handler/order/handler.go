@@ -56,18 +56,18 @@ const maxBodyBytes = 1024
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
 	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	number := strings.TrimSpace(string(body))
 	if number == "" {
-		http.Error(w, "empty order number", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -77,12 +77,12 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, domain.ErrOrderAlreadyOwned):
 		w.WriteHeader(http.StatusOK)
 	case errors.Is(err, domain.ErrOrderOwnedByOther):
-		http.Error(w, "order owned by another user", http.StatusConflict)
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
 	case errors.Is(err, domain.ErrInvalidLuhn):
-		http.Error(w, "invalid order number", http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
 	default:
 		h.log.Error("ошибка загрузки заказа", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 
@@ -100,14 +100,14 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
 	orders, err := h.svc.List(r.Context(), userID)
 	if err != nil {
 		h.log.Error("ошибка списка заказов", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if len(orders) == 0 {

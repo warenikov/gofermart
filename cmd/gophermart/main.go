@@ -14,6 +14,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	stdlog "log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,12 +39,12 @@ import (
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		panic(err)
+		stdlog.Fatalf("ошибка загрузки конфигурации: %v", err)
 	}
 
 	log, err := logger.New(cfg.LogLevel, cfg.LogFormat)
 	if err != nil {
-		panic(err)
+		stdlog.Fatalf("ошибка инициализации логгера: %v", err)
 	}
 	defer log.Sync() //nolint:errcheck
 

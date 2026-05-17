@@ -48,14 +48,14 @@ func NewHandler(svc Service, log *zap.Logger) *Handler {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
 	b, err := h.svc.Get(r.Context(), userID)
 	if err != nil {
 		h.log.Error("ошибка получения баланса", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
@@ -92,11 +92,11 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	if req.Order == "" {
-		http.Error(w, "order is required", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -104,14 +104,14 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	case err == nil:
 		w.WriteHeader(http.StatusOK)
 	case errors.Is(err, balancesvc.ErrInvalidSum):
-		http.Error(w, "invalid sum", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	case errors.Is(err, domain.ErrInvalidLuhn):
-		http.Error(w, "invalid order number", http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
 	case errors.Is(err, domain.ErrInsufficientFunds):
-		http.Error(w, "insufficient funds", http.StatusPaymentRequired)
+		http.Error(w, http.StatusText(http.StatusPaymentRequired), http.StatusPaymentRequired)
 	default:
 		h.log.Error("ошибка списания", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 
@@ -129,14 +129,14 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromCtx(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
 	list, err := h.svc.ListWithdrawals(r.Context(), userID)
 	if err != nil {
 		h.log.Error("ошибка списка списаний", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if len(list) == 0 {

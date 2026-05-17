@@ -97,11 +97,11 @@ func decodeCreds(w http.ResponseWriter, r *http.Request) (credentials, bool) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&c); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return c, false
 	}
 	if c.Login == "" || c.Password == "" {
-		http.Error(w, "login and password are required", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return c, false
 	}
 	return c, true
@@ -110,22 +110,22 @@ func decodeCreds(w http.ResponseWriter, r *http.Request) (credentials, bool) {
 func (h *Handler) handleRegisterError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authsvc.ErrInvalidInput):
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	case errors.Is(err, domain.ErrLoginTaken):
-		http.Error(w, "login taken", http.StatusConflict)
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
 	default:
 		h.log.Error("ошибка регистрации", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 
 func (h *Handler) handleLoginError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidCredentials):
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 	default:
 		h.log.Error("ошибка логина", logger.Err(err))
-		http.Error(w, "internal", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 

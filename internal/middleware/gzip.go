@@ -19,7 +19,7 @@ func DecompressGzip(next http.Handler) http.Handler {
 
 		gz, err := gzip.NewReader(r.Body)
 		if err != nil {
-			http.Error(w, "invalid gzip body", http.StatusBadRequest)
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
 		defer func() { _ = gz.Close() }()
