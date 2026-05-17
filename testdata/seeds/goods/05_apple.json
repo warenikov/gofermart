@@ -1,0 +1,5 @@
+{
+  "match": "Apple",
+  "reward": 7,
+  "reward_type": "%"
+}

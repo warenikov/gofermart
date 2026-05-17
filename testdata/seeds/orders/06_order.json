@@ -1,0 +1,7 @@
+{
+  "order": "3000000004",
+  "goods": [
+    {"description": "Дрель Bosch Professional", "price": 12000},
+    {"description": "Шуруповёрт Bosch GSR 12V", "price": 8500}
+  ]
+}

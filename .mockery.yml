@@ -1,0 +1,11 @@
+all: false
+template: testify
+packages:
+  github.com/warenikov/gofermart/internal/accrual:
+    config:
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: "mock_{{.InterfaceName | snakecase}}.go"
+      pkgname: mocks
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      AccrualClient:

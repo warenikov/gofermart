@@ -1,0 +1,8 @@
+{
+  "order": "2024010023",
+  "goods": [
+    {"description": "iPhone 15 Apple", "price": 90000},
+    {"description": "Sony WH-1000XM5 наушники", "price": 28000},
+    {"description": "Кроссовки Nike React", "price": 8000}
+  ]
+}

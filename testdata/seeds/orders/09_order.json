@@ -1,0 +1,7 @@
+{
+  "order": "6000000007",
+  "goods": [
+    {"description": "Ноутбук Dell XPS 15", "price": 150000},
+    {"description": "Мышь Dell Wireless", "price": 3000}
+  ]
+}
