@@ -102,6 +102,9 @@ func (w *Worker) Run(ctx context.Context) error {
 		go func() {
 			defer wg.Done()
 			for number := range jobs {
+				if !w.waitRateLimit(ctx, rateLimitedUntil) {
+					return
+				}
 				w.processOne(ctx, number, setRateLimit)
 			}
 		}()
@@ -117,6 +120,25 @@ func (w *Worker) Run(ctx context.Context) error {
 	wg.Wait()
 	w.log.Info("поллер accrual остановлен")
 	return nil
+}
+
+// waitRateLimit блокирует worker'а до истечения rate-limit окна.
+// Возвращает false, если ctx отменён во время ожидания.
+func (w *Worker) waitRateLimit(ctx context.Context, pausedUntil func() time.Time) bool {
+	until := pausedUntil()
+	wait := time.Until(until)
+	if wait <= 0 {
+		return true
+	}
+	w.log.Debug("worker ждёт окончания rate-limit", zap.Duration("wait", wait))
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (w *Worker) runGenerator(ctx context.Context, jobs chan<- string, pausedUntil func() time.Time) {
@@ -145,6 +167,11 @@ func (w *Worker) runGenerator(ctx context.Context, jobs chan<- string, pausedUnt
 		}
 
 		for _, o := range list {
+			if time.Now().Before(pausedUntil()) {
+				// Rate-limit поймали внутри батча — не сливаем остаток в очередь,
+				// дождёмся следующего тика.
+				break
+			}
 			select {
 			case <-ctx.Done():
 				return

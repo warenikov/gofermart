@@ -23,7 +23,7 @@ func TestClient_GetOrder_OK_WithAccrual(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	info, err := cl.GetOrder(t.Context(), "12345678903")
 	require.NoError(t, err)
 	assert.Equal(t, "12345678903", info.Order)
@@ -40,7 +40,7 @@ func TestClient_GetOrder_OK_WithoutAccrual(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	info, err := cl.GetOrder(t.Context(), "12345678903")
 	require.NoError(t, err)
 	assert.Equal(t, accrual.StatusProcessing, info.Status)
@@ -54,7 +54,7 @@ func TestClient_GetOrder_204_NotRegistered(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	_, err := cl.GetOrder(t.Context(), "12345678903")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, accrual.ErrOrderNotRegistered))
@@ -68,7 +68,7 @@ func TestClient_GetOrder_429_RetryAfterSeconds(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	_, err := cl.GetOrder(t.Context(), "12345678903")
 	require.Error(t, err)
 	var rl *accrual.RateLimitError
@@ -83,7 +83,7 @@ func TestClient_GetOrder_429_NoRetryAfter_FallsBackToDefault(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	_, err := cl.GetOrder(t.Context(), "12345678903")
 	require.Error(t, err)
 	var rl *accrual.RateLimitError
@@ -98,7 +98,7 @@ func TestClient_GetOrder_500_ReturnsOopsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	_, err := cl.GetOrder(t.Context(), "12345678903")
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, accrual.ErrOrderNotRegistered))
@@ -114,7 +114,7 @@ func TestClient_GetOrder_BadJSON_ReturnsOopsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := accrual.New(srv.URL, time.Second)
+	cl := accrual.New(srv.URL, time.Second, nil)
 	_, err := cl.GetOrder(t.Context(), "12345678903")
 	require.Error(t, err)
 }

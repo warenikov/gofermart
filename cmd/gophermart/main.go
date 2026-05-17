@@ -97,7 +97,7 @@ func main() {
 	orderHandler := orderh.NewHandler(orderService, log)
 	balanceHandler := balanceh.NewHandler(balanceService, log)
 
-	accrualClient := accrual.New(cfg.AccrualSystemAddress, 0)
+	accrualClient := accrual.New(cfg.AccrualSystemAddress, 0, log)
 	worker := accrual.NewWorker(accrualClient, orderRepo, accrual.WorkerConfig{}, log)
 
 	srv, err := server.New(

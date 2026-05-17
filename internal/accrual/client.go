@@ -11,8 +11,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/samber/oops"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
+
+	"github.com/warenikov/gofermart/internal/logger"
 )
 
 // ErrOrderNotRegistered — accrual вернул 204: заказ не зарегистрирован в системе расчёта.
@@ -47,30 +51,62 @@ type OrderInfo struct {
 }
 
 // Client — HTTP-клиент к системе расчёта начислений.
+// Использует retryablehttp для ретраев на 5xx/сетевых ошибках; 429 НЕ ретраит —
+// его выдаёт наружу как [RateLimitError], чтобы воркер мог реализовать backoff.
 type Client struct {
 	baseURL string
 	http    *http.Client
+	log     *zap.Logger
 }
 
-const defaultTimeout = 5 * time.Second
+const (
+	defaultTimeout   = 5 * time.Second
+	defaultRetryMax  = 3
+	retryWaitMinimum = 200 * time.Millisecond
+	retryWaitMaximum = 2 * time.Second
+)
 
 // New создаёт клиент с указанным baseURL и таймаутом запроса.
 // Если timeout == 0, используется 5 секунд.
-func New(baseURL string, timeout time.Duration) *Client {
+// Логгер используется для диагностики ретраев и невалидного Retry-After; nil — без логирования.
+func New(baseURL string, timeout time.Duration, log *zap.Logger) *Client {
 	if timeout <= 0 {
 		timeout = defaultTimeout
 	}
+	if log == nil {
+		log = zap.NewNop()
+	}
+	clog := logger.For(log, "accrual.client")
+
+	rc := retryablehttp.NewClient()
+	rc.RetryMax = defaultRetryMax
+	rc.RetryWaitMin = retryWaitMinimum
+	rc.RetryWaitMax = retryWaitMaximum
+	rc.Logger = nil // не льём в stderr
+	rc.HTTPClient.Timeout = timeout
+	rc.CheckRetry = retryPolicyKeep429
+
 	return &Client{
 		baseURL: baseURL,
-		http:    &http.Client{Timeout: timeout},
+		http:    rc.StandardClient(),
+		log:     clog,
 	}
+}
+
+// retryPolicyKeep429 — стандартная политика ретраев, но 429 пропускается
+// без ретраев (его обрабатывает вызывающий код через [RateLimitError]).
+func retryPolicyKeep429(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+		return false, nil
+	}
+	return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 }
 
 // GetOrder запрашивает информацию о начислении для заказа.
 // Возможные ошибки:
 //   - ErrOrderNotRegistered — accrual вернул 204
 //   - *RateLimitError — accrual вернул 429
-//   - oops-ошибка для всего остального (сеть, 5xx, невалидный JSON)
+//   - oops-ошибка для всего остального (сеть, 5xx после исчерпания ретраев, невалидный JSON)
 func (c *Client) GetOrder(ctx context.Context, number string) (*OrderInfo, error) {
 	url := c.baseURL + "/api/orders/" + number
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
@@ -94,7 +130,7 @@ func (c *Client) GetOrder(ctx context.Context, number string) (*OrderInfo, error
 		return nil, ErrOrderNotRegistered
 
 	case http.StatusTooManyRequests:
-		return nil, &RateLimitError{RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}
+		return nil, &RateLimitError{RetryAfter: c.parseRetryAfter(resp.Header.Get("Retry-After"))}
 
 	default:
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
@@ -126,7 +162,7 @@ func decodeOK(body io.Reader) (*OrderInfo, error) {
 
 const defaultRetryAfter = 60 * time.Second
 
-func parseRetryAfter(h string) time.Duration {
+func (c *Client) parseRetryAfter(h string) time.Duration {
 	if h == "" {
 		return defaultRetryAfter
 	}
@@ -138,5 +174,8 @@ func parseRetryAfter(h string) time.Duration {
 			return d
 		}
 	}
+	c.log.Warn("не удалось разобрать Retry-After, используем дефолт",
+		zap.String("header", h),
+		zap.Duration("default", defaultRetryAfter))
 	return defaultRetryAfter
 }
