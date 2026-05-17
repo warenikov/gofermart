@@ -1,4 +1,4 @@
-package accrual
+package accrual_test
 
 import (
 	"context"
@@ -10,30 +10,26 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/warenikov/gofermart/internal/accrual"
+	mocks "github.com/warenikov/gofermart/internal/accrual/mocks"
 	"github.com/warenikov/gofermart/internal/domain"
 )
 
-type fakeClient struct {
-	getOrderFn func(ctx context.Context, number string) (*OrderInfo, error)
-	calls      atomic.Int32
-}
-
-func (f *fakeClient) GetOrder(ctx context.Context, number string) (*OrderInfo, error) {
-	f.calls.Add(1)
-	return f.getOrderFn(ctx, number)
-}
-
+// fakeOrders — простой stateful-репозиторий для тестов воркера.
+// AccrualClient мокается через mockery, а OrderUpdater остаётся
+// stateful-фейком: моки testify плохо работают с потоковым накоплением событий.
 type fakeOrders struct {
 	mu             sync.Mutex
 	pending        []domain.Order
-	updates        []update
+	updates        []orderUpdate
 	listUnfinished func(ctx context.Context, limit int) ([]domain.Order, error)
 }
 
-type update struct {
+type orderUpdate struct {
 	number  string
 	status  domain.OrderStatus
 	accrual decimal.NullDecimal
@@ -57,112 +53,155 @@ func (f *fakeOrders) ListUnfinished(ctx context.Context, limit int) ([]domain.Or
 func (f *fakeOrders) UpdateStatus(_ context.Context, number string, status domain.OrderStatus, accrual decimal.NullDecimal) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.updates = append(f.updates, update{number: number, status: status, accrual: accrual})
+	f.updates = append(f.updates, orderUpdate{number: number, status: status, accrual: accrual})
 	return nil
 }
 
-func TestProcessOrder_MapsProcessedWithAccrual(t *testing.T) {
-	t.Parallel()
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return &OrderInfo{
-			Order:   "12345678903",
-			Status:  StatusProcessed,
-			Accrual: decimal.NullDecimal{Decimal: decimal.NewFromInt(500), Valid: true},
-		}, nil
-	}}
-	orders := &fakeOrders{}
-
-	rl, err := processOrder(t.Context(), client, orders, "12345678903")
-	require.NoError(t, err)
-	assert.Nil(t, rl)
-	require.Len(t, orders.updates, 1)
-	assert.Equal(t, domain.OrderStatusProcessed, orders.updates[0].status)
-	assert.True(t, orders.updates[0].accrual.Valid)
+func (f *fakeOrders) snapshotUpdates() []orderUpdate {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]orderUpdate, len(f.updates))
+	copy(out, f.updates)
+	return out
 }
 
-func TestProcessOrder_MapsRegisteredToProcessing(t *testing.T) {
-	t.Parallel()
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return &OrderInfo{Order: "x", Status: StatusRegistered}, nil
-	}}
-	orders := &fakeOrders{}
-	_, err := processOrder(t.Context(), client, orders, "x")
-	require.NoError(t, err)
-	require.Len(t, orders.updates, 1)
-	assert.Equal(t, domain.OrderStatusProcessing, orders.updates[0].status)
-}
-
-func TestProcessOrder_NotRegistered_SkipsUpdate(t *testing.T) {
-	t.Parallel()
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return nil, ErrOrderNotRegistered
-	}}
-	orders := &fakeOrders{}
-	rl, err := processOrder(t.Context(), client, orders, "x")
-	require.NoError(t, err)
-	assert.Nil(t, rl)
-	assert.Empty(t, orders.updates, "не должно быть обновлений")
-}
-
-func TestProcessOrder_RateLimit_ReturnsRetryAfter(t *testing.T) {
-	t.Parallel()
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return nil, &RateLimitError{RetryAfter: 30 * time.Second}
-	}}
-	orders := &fakeOrders{}
-	rl, err := processOrder(t.Context(), client, orders, "x")
-	require.NoError(t, err)
-	require.NotNil(t, rl)
-	assert.Equal(t, 30*time.Second, rl.RetryAfter)
-	assert.Empty(t, orders.updates)
-}
-
-func TestProcessOrder_TransportError_Propagates(t *testing.T) {
-	t.Parallel()
-	boom := errors.New("network down")
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return nil, boom
-	}}
-	rl, err := processOrder(t.Context(), client, &fakeOrders{}, "x")
-	require.Error(t, err)
-	assert.Nil(t, rl)
-	assert.ErrorIs(t, err, boom)
-}
-
-func TestWorker_Run_ProcessesAndShutsDownOnCtxCancel(t *testing.T) {
-	t.Parallel()
-	orders := &fakeOrders{
-		pending: []domain.Order{
-			{Number: "12345678903", Status: domain.OrderStatusNew},
-			{Number: "346436439", Status: domain.OrderStatusNew},
-		},
-	}
-	client := &fakeClient{getOrderFn: func(_ context.Context, number string) (*OrderInfo, error) {
-		return &OrderInfo{
-			Order:   number,
-			Status:  StatusProcessed,
-			Accrual: decimal.NullDecimal{Decimal: decimal.NewFromInt(100), Valid: true},
-		}, nil
-	}}
-
-	w := NewWorker(client, orders, WorkerConfig{
+func newWorker(t *testing.T, client accrual.AccrualClient, orders accrual.OrderUpdater) *accrual.Worker {
+	t.Helper()
+	return accrual.NewWorker(client, orders, accrual.WorkerConfig{
 		PollInterval: 5 * time.Millisecond,
 		Workers:      2,
 		BatchLimit:   10,
 	}, zap.NewNop())
+}
 
+func runWorker(t *testing.T, w *accrual.Worker) (cancel context.CancelFunc, done <-chan error) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
+	d := make(chan error, 1)
+	go func() { d <- w.Run(ctx) }()
+	return cancel, d
+}
+
+func TestWorker_Run_ProcessedWithAccrual_UpdatesOrder(t *testing.T) {
+	t.Parallel()
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, "12345678903").
+		Return(&accrual.OrderInfo{
+			Order:   "12345678903",
+			Status:  accrual.StatusProcessed,
+			Accrual: decimal.NullDecimal{Decimal: decimal.NewFromInt(500), Valid: true},
+		}, nil).
+		Maybe()
+
+	orders := &fakeOrders{pending: []domain.Order{{Number: "12345678903"}}}
+	w := newWorker(t, client, orders)
+
+	cancel, done := runWorker(t, w)
 	defer cancel()
 
-	done := make(chan error, 1)
-	go func() { done <- w.Run(ctx) }()
+	require.Eventually(t, func() bool {
+		return len(orders.snapshotUpdates()) == 1
+	}, time.Second, 5*time.Millisecond)
+	cancel()
+	<-done
+
+	upd := orders.snapshotUpdates()[0]
+	assert.Equal(t, domain.OrderStatusProcessed, upd.status)
+	require.True(t, upd.accrual.Valid)
+	assert.True(t, upd.accrual.Decimal.Equal(decimal.NewFromInt(500)))
+}
+
+func TestWorker_Run_RegisteredStatus_MapsToProcessing(t *testing.T) {
+	t.Parallel()
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, mock.Anything).
+		Return(&accrual.OrderInfo{Order: "x", Status: accrual.StatusRegistered}, nil).
+		Maybe()
+
+	orders := &fakeOrders{pending: []domain.Order{{Number: "x"}}}
+	w := newWorker(t, client, orders)
+
+	cancel, done := runWorker(t, w)
+	defer cancel()
+	require.Eventually(t, func() bool {
+		return len(orders.snapshotUpdates()) == 1
+	}, time.Second, 5*time.Millisecond)
+	cancel()
+	<-done
+
+	assert.Equal(t, domain.OrderStatusProcessing, orders.snapshotUpdates()[0].status)
+}
+
+func TestWorker_Run_NotRegistered_SkipsUpdate(t *testing.T) {
+	t.Parallel()
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, mock.Anything).
+		Return(nil, accrual.ErrOrderNotRegistered).
+		Maybe()
+
+	orders := &fakeOrders{pending: []domain.Order{{Number: "x"}}}
+	w := newWorker(t, client, orders)
+
+	cancel, done := runWorker(t, w)
+	defer cancel()
+	// Ждём, пока генератор успеет сходить за заказом, потом останавливаем.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	<-done
+
+	assert.Empty(t, orders.snapshotUpdates(), "204 не должно приводить к обновлению")
+}
+
+func TestWorker_Run_TransportError_DoesNotUpdate(t *testing.T) {
+	t.Parallel()
+	boom := errors.New("network down")
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, mock.Anything).
+		Return(nil, boom).
+		Maybe()
+
+	orders := &fakeOrders{pending: []domain.Order{{Number: "x"}}}
+	w := newWorker(t, client, orders)
+
+	cancel, done := runWorker(t, w)
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	<-done
+
+	assert.Empty(t, orders.snapshotUpdates())
+}
+
+func TestWorker_Run_ProcessesAndShutsDownOnCtxCancel(t *testing.T) {
+	t.Parallel()
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, number string) (*accrual.OrderInfo, error) {
+			return &accrual.OrderInfo{
+				Order:   number,
+				Status:  accrual.StatusProcessed,
+				Accrual: decimal.NullDecimal{Decimal: decimal.NewFromInt(100), Valid: true},
+			}, nil
+		}).
+		Maybe()
+
+	orders := &fakeOrders{pending: []domain.Order{
+		{Number: "12345678903"},
+		{Number: "346436439"},
+	}}
+	w := newWorker(t, client, orders)
+
+	cancel, done := runWorker(t, w)
+	defer cancel()
 
 	require.Eventually(t, func() bool {
-		orders.mu.Lock()
-		defer orders.mu.Unlock()
-		return len(orders.updates) == 2
+		return len(orders.snapshotUpdates()) == 2
 	}, time.Second, 10*time.Millisecond, "оба заказа должны быть обновлены")
-
 	cancel()
 
 	select {
@@ -175,41 +214,37 @@ func TestWorker_Run_ProcessesAndShutsDownOnCtxCancel(t *testing.T) {
 
 func TestWorker_Run_RateLimit_PausesGenerator(t *testing.T) {
 	t.Parallel()
-	var callCount atomic.Int32
+	var listCalls atomic.Int32
 	orders := &fakeOrders{
 		listUnfinished: func(_ context.Context, _ int) ([]domain.Order, error) {
-			n := callCount.Add(1)
+			n := listCalls.Add(1)
 			if n > 1 {
-				// после первого вызова должно быть rate-limit, последующие
-				// тики пропускаются — нового вызова почти не будет
 				return nil, nil
 			}
 			return []domain.Order{{Number: "12345678903"}}, nil
 		},
 	}
-	client := &fakeClient{getOrderFn: func(_ context.Context, _ string) (*OrderInfo, error) {
-		return nil, &RateLimitError{RetryAfter: time.Hour}
-	}}
 
-	w := NewWorker(client, orders, WorkerConfig{
+	client := mocks.NewMockAccrualClient(t)
+	client.EXPECT().
+		GetOrder(mock.Anything, mock.Anything).
+		Return(nil, &accrual.RateLimitError{RetryAfter: time.Hour}).
+		Maybe()
+
+	w := accrual.NewWorker(client, orders, accrual.WorkerConfig{
 		PollInterval: 5 * time.Millisecond,
 		Workers:      1,
 		BatchLimit:   10,
 	}, zap.NewNop())
 
-	ctx, cancel := context.WithCancel(t.Context())
+	cancel, done := runWorker(t, w)
 	defer cancel()
-
-	done := make(chan error, 1)
-	go func() { done <- w.Run(ctx) }()
-
 	time.Sleep(80 * time.Millisecond)
 	cancel()
 	<-done
 
-	// без rate-limit мы бы видели десятки вызовов ListUnfinished за 80мс при тике 5мс.
-	// С rate-limit — практически только первый.
-	assert.Less(t, callCount.Load(), int32(5),
-		"generator должен почти полностью встать после rate-limit, получено вызовов: %d",
-		callCount.Load())
+	// Без rate-limit за 80мс при тике 5мс мы бы видели десятки вызовов ListUnfinished.
+	// С rate-limit генератор должен «встать», и количество вызовов остаётся низким.
+	assert.Less(t, listCalls.Load(), int32(5),
+		"generator должен остановиться после rate-limit, вызовов: %d", listCalls.Load())
 }

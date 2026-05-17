@@ -24,7 +24,7 @@ TEST_DB_URI  := postgresql://postgres:postgres@localhost:5433/gofermart_test?ssl
         accrual-start \
         seed seed-goods seed-orders \
         test-unit test-integration test-all \
-        lint swagger help
+        mocks lint swagger help
 
 all: build
 
@@ -96,6 +96,10 @@ test-integration:
 
 ## test-all: запустить все тесты
 test-all: test-unit test-integration
+
+## mocks: сгенерировать моки по конфигу .mockery.yml
+mocks:
+	go tool mockery
 
 ## lint: запустить линтер
 lint:
